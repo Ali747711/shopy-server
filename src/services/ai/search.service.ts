@@ -12,11 +12,10 @@ import { logger } from "../../libs/utils/logger";
 import ProductModel from "../../schemas/product.schema";
 import CostService from "./cost.service";
 import EmbeddingService from "./embedding.service";
+import { vectorSearchProducts } from "./vector";
 
-const VECTOR_INDEX = "product_vector_index";
 const RESULT_TTL_SECONDS = 60 * 60; // cache a full search response for 1h
 const TOP_K = 8;
-const NUM_CANDIDATES = 100;
 
 const INTENT_SYSTEM_PROMPT = `You extract structured search filters from an e-commerce shopping query.
 Return ONLY a JSON object with any of these keys you can confidently infer:
@@ -102,7 +101,7 @@ export class AiSearchService {
     intent: SearchIntent,
     query: string
   ): Promise<ScoredProduct[]> => {
-    const filter: any = { productStatus: { $eq: ProductStatus.ACTIVE } };
+    const filter: any = {};
     if (intent.category) filter.productCategory = { $eq: intent.category };
     if (intent.minPrice != null || intent.maxPrice != null) {
       filter.productPrice = {};
@@ -111,29 +110,7 @@ export class AiSearchService {
     }
 
     try {
-      const docs: any[] = await ProductModel.aggregate([
-        {
-          $vectorSearch: {
-            index: VECTOR_INDEX,
-            path: "productEmbedding",
-            queryVector,
-            numCandidates: NUM_CANDIDATES,
-            limit: TOP_K,
-            filter,
-          },
-        },
-        {
-          $project: {
-            productName: 1,
-            productDescription: 1,
-            productCategory: 1,
-            productPrice: 1,
-            productCurrency: 1,
-            productTags: 1,
-            score: { $meta: "vectorSearchScore" },
-          },
-        },
-      ]).exec();
+      const docs = await vectorSearchProducts(queryVector, { filter, limit: TOP_K });
       return docs.map((d) => this.toScored(d, d.score));
     } catch (error) {
       logger.warn("Vector search unavailable; falling back to keyword search", error);

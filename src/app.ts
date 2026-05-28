@@ -12,6 +12,7 @@ import userRouter from "./routes/user.route";
 import productRouter from "./routes/product.route";
 import eventRouter from "./routes/event.route";
 import aiRouter from "./routes/ai.route";
+import recommendationRouter from "./routes/recommendation.route";
 import { errorHandler, notFound } from "./middlewares/error.middleware";
 
 const app = express();
@@ -35,6 +36,7 @@ app.use("/api/auth", userRouter);
 app.use("/api/products", productRouter);
 app.use("/api/events", eventRouter);
 app.use("/api/ai", aiRouter);
+app.use("/api/recommendations", recommendationRouter);
 
 // Fallbacks
 app.use(notFound);

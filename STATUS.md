@@ -3,7 +3,7 @@
 > **Purpose:** Single source of truth for *where we are*. Read this first at the start of every session, update it at the end. Pairs with [`system-design.md`](./system-design.md) (the *what/why*).
 
 **Last updated:** 2026-05-29
-**Current phase:** Phase 2 complete ✅ → Phase 3 (Recommendations) next
+**Current phase:** Phase 3 complete ✅ → Phase 4 (Hardening) next
 
 ---
 
@@ -40,7 +40,12 @@ AI-powered e-commerce **backend**. Express 5 + TypeScript (CommonJS) + Mongoose 
   - [x] Intent extraction (`gpt-4o-mini`) → context assembly → explanation (`gpt-4o`)
   - [x] Redis caching of embeddings (30d) + full search responses (1h); daily budget guardrail with graceful degrade + keyword fallback
   - [ ] _Deferred:_ SSE streaming of the explanation (returns full JSON for now)
-- [ ] **Phase 3 — Recommendations** (content-based + collaborative + cold-start + explainability)
+- [x] **Phase 3 — Recommendations** *(12 smoke checks passing)*
+  - [x] `GET /api/recommendations/similar/:productId` (public) — vector similarity to one product
+  - [x] `GET /api/recommendations` (auth) — waterfall blend: content-based (weighted profile vector over engagement) → collaborative (co-engaged peers) → trending fill
+  - [x] Cold-start: trending fallback (→ highest-rated/newest if no events) for users with no history
+  - [x] Per-item explainability `reason` + `source`; engaged products excluded; Redis cached (similar 1h, personalized 10m)
+  - [ ] _Note:_ engagement is **events-only** — orders aren't built yet (no order schema/endpoints), so PURCHASE weight only applies to PURCHASE events
 - [ ] **Phase 4 — Hardening** (rate limiting, load tests, observability, CI/CD, deploy)
 
 ---
@@ -86,8 +91,11 @@ AI-powered e-commerce **backend**. Express 5 + TypeScript (CommonJS) + Mongoose 
 - `POST /api/products` · `PATCH /api/products/:id` · `DELETE /api/products/:id` *(admin only)*
 - `POST /api/events` *(optional auth)*
 - `POST /api/ai/search` *(optional auth)* — body `{ "query": "..." }` → `{ intent, products[], explanation, cached, degraded }`
+- `GET  /api/recommendations` *(auth)* — "recommended for you" → `{ strategy, items[], cached }`
+- `GET  /api/recommendations/similar/:productId` *(public)* — "because you viewed X"
 
-**Verify locally:** `npx ts-node src/server.ts` in one shell, then `node scripts/smoke.mjs` → expect `16 passed, 0 failed`.
+**Verify locally:** `npx ts-node src/server.ts` in one shell, then `node scripts/smoke.mjs` (→ `16 passed`) and `node scripts/smoke-recs.mjs` (→ `12 passed`).
+**Make an admin:** `npm run make-admin -- "email@x.com"`, then re-login.
 *(Smoke test promotes a user to ADMIN directly in Mongo since registration always creates USER — there's no self-serve admin signup by design.)*
 
 **AI / vector setup (one-time per DB):** `npm run seed` (loads 8 sample products + embeddings) → `npm run create-index` (creates `product_vector_index`, waits until queryable). Re-run `create-index` only if the index is dropped.
@@ -105,23 +113,28 @@ src/
   middlewares/ error.middleware.ts · validate.middleware.ts
   config/      ... · openai.ts
   schemas/     user.schema.ts · product.schema.ts · event.schema.ts
-  services/    auth.service.ts · user.service.ts · product.service.ts · event.service.ts
-    ai/        embedding.service.ts · search.service.ts · cost.service.ts
-  controllers/ user · product · event · ai .controller.ts
+  services/    auth · user · product · event · recommendation .service.ts
+    ai/        embedding.service.ts · search.service.ts · cost.service.ts · vector.ts
+  controllers/ user · product · event · ai · recommendation .controller.ts
   validators/  user · product · event · ai .validator.ts
-  routes/      health · user · product · event · ai .route.ts
+  routes/      health · user · product · event · ai · recommendation .route.ts
   app.ts · server.ts
-scripts/       smoke.mjs · seed.ts · create-vector-index.ts
+scripts/       smoke.mjs · smoke-recs.mjs · seed.ts · create-vector-index.ts · make-admin.ts
+postman/       shopy.postman_collection.json
 ```
 
 ---
 
 ## Next Action
 
-Start **Phase 3 — Recommendations**:
-- `GET /api/recommendations` (auth) — "recommended for you": blend content-based (vector similarity to products the user engaged with via `events`/`orders`) + collaborative (co-engagement) + LLM re-ranking/explanation.
-- `GET /api/recommendations/similar/:productId` (public) — "because you viewed X": vector similarity to one product (reuse `$vectorSearch` with the product's own embedding).
-- Cold-start: popularity/trending fallback for new users; content-based only for new products.
-- Explainability string per recommendation; precompute "recommended for you" into a cache (Redis or `recommendation_cache`).
+Start **Phase 4 — Hardening**:
+- Rate limiting (Upstash `@upstash/ratelimit`) — global + stricter on `/api/ai/*` (cost protection).
+- Observability: request id correlation, AI metrics (latency, cache-hit, token spend).
+- CI (GitHub Actions): typecheck + build + smoke tests.
+- Dockerfile + deploy config (Railway/Render).
+- Load test (k6) on catalog + AI search.
 
-**Possible quick win first:** add SSE streaming to `/api/ai/search` (deferred from Phase 2) if a streaming UX is wanted before recommendations.
+**Deferred / possible side quests:**
+- Orders domain (schema + endpoints) → lets recommendations weight real purchases.
+- SSE streaming for `/api/ai/search`.
+- LLM re-ranking/explanation layer for recommendations (currently rule-based reasons).
