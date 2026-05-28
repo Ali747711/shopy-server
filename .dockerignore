@@ -1,0 +1,16 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+*.log
+coverage
+scripts
+postman
+loadtest
+STATUS.md
+.claude
+.vscode
+.idea
+.DS_Store

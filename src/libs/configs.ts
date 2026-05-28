@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 export const MORGAN_FORMAT =
-  "Method: :method | URL: :url | :response-time ms | S-code: [:status] | HTTP/:http-version";
+  ":method :url [:status] :response-time ms | req::id";
 
 export const shapeIntoMongooseObjectId = (target: any) => {
   return typeof target === "string"

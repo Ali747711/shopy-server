@@ -15,8 +15,15 @@ import aiRouter from "./routes/ai.route";
 import recommendationRouter from "./routes/recommendation.route";
 import orderRouter from "./routes/order.route";
 import { errorHandler, notFound } from "./middlewares/error.middleware";
+import { requestId } from "./middlewares/requestId.middleware";
+import { aiRateLimiter, globalRateLimiter } from "./middlewares/rateLimit.middleware";
 
 const app = express();
+
+// Behind a proxy (Render/Railway) so req.ip reflects the real client.
+app.set("trust proxy", 1);
+
+morgan.token("id", (req: any) => req.id);
 
 app.use(helmet());
 app.use(
@@ -29,10 +36,16 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(compression());
+app.use(requestId);
 app.use(morgan(MORGAN_FORMAT));
 
-// Routes
+// Health is intentionally not rate-limited (monitoring/uptime probes).
 app.use("/health", healthRouter);
+
+// Per-IP guard across the API; AI endpoints get an extra tight limiter.
+app.use("/api", globalRateLimiter);
+app.use("/api/ai", aiRateLimiter);
+
 app.use("/api/auth", userRouter);
 app.use("/api/products", productRouter);
 app.use("/api/events", eventRouter);
