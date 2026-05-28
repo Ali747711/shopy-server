@@ -9,6 +9,8 @@
     "start": "node dist/server.js",
     "clean": "rm -rf dist",
     "type-check": "tsc --noEmit",
+    "seed": "ts-node scripts/seed.ts",
+    "create-index": "ts-node scripts/create-vector-index.ts",
     "test": "echo \"no tests yet\" && exit 0"
   },
   "keywords": [
@@ -34,6 +36,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.5",
     "morgan": "^1.10.0",
+    "openai": "^4.104.0",
     "uuid": "^11.0.5",
     "zod": "^3.24.1"
   },

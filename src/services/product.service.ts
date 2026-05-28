@@ -1,3 +1,4 @@
+import { env } from "../config/env";
 import { shapeIntoMongooseObjectId } from "../libs/configs";
 import Errors, { HttpCode, Message } from "../libs/Errors";
 import { ProductSort, ProductStatus } from "../libs/enums/product.enum";
@@ -7,19 +8,32 @@ import {
   ProductInquiry,
   ProductUpdateInput,
 } from "../libs/types/product";
+import { logger } from "../libs/utils/logger";
 import ProductModel from "../schemas/product.schema";
+import EmbeddingService from "./ai/embedding.service";
+
+const EMBED_FIELDS = [
+  "productName",
+  "productDescription",
+  "productCategory",
+  "productTags",
+] as const;
 
 class ProductService {
   private readonly productModel;
+  private readonly embeddingService;
 
   constructor() {
     this.productModel = ProductModel;
+    this.embeddingService = new EmbeddingService();
   }
 
   public createProduct = async (input: ProductInput): Promise<Product> => {
+    const payload: any = { ...input };
+    await this.attachEmbedding(payload, input);
     try {
-      const created: any = await this.productModel.create(input);
-      return created.toObject();
+      const created: any = await this.productModel.create(payload);
+      return this.stripEmbedding(created.toObject());
     } catch {
       throw new Errors(HttpCode.BAD_REQUEST, Message.CREATE_FAILED);
     }
@@ -79,10 +93,28 @@ class ProductService {
     input: ProductUpdateInput
   ): Promise<Product> => {
     const _id = shapeIntoMongooseObjectId(id);
+    const set: any = { ...input };
+
+    // Re-embed only when a searchable field changed; merge with current doc
+    // so a partial update still produces complete embedding text.
+    if (EMBED_FIELDS.some((f) => f in input)) {
+      const current: any = await this.productModel
+        .findOne({ _id, productStatus: { $ne: ProductStatus.DELETE } })
+        .exec();
+      if (!current) throw new Errors(HttpCode.NOT_FOUND, Message.NO_DATA_FOUND);
+      const merged = {
+        productName: input.productName ?? current.productName,
+        productDescription: input.productDescription ?? current.productDescription,
+        productCategory: input.productCategory ?? current.productCategory,
+        productTags: input.productTags ?? current.productTags,
+      };
+      await this.attachEmbedding(set, merged);
+    }
+
     const updated: any = await this.productModel
       .findOneAndUpdate(
         { _id, productStatus: { $ne: ProductStatus.DELETE } },
-        { $set: input },
+        { $set: set },
         { new: true, runValidators: true }
       )
       .select("-productEmbedding")
@@ -99,6 +131,32 @@ class ProductService {
     );
     if (updated.matchedCount === 0)
       throw new Errors(HttpCode.NOT_FOUND, Message.NO_DATA_FOUND);
+  };
+
+  /** Best-effort: embeds searchable text onto a write payload; never blocks the write. */
+  private attachEmbedding = async (
+    target: any,
+    source: Pick<
+      ProductInput,
+      "productName" | "productDescription" | "productCategory" | "productTags"
+    >
+  ): Promise<void> => {
+    try {
+      const text = this.embeddingService.productText(source);
+      target.productEmbedding = await this.embeddingService.embed(text);
+      target.productEmbeddingModel = env.OPENAI_EMBED_MODEL;
+      target.productEmbeddedAt = new Date();
+    } catch (error) {
+      logger.warn(
+        "Embedding generation failed; product saved without embedding",
+        error
+      );
+    }
+  };
+
+  private stripEmbedding = (obj: any): Product => {
+    delete obj.productEmbedding;
+    return obj as Product;
   };
 
   private buildSort = (sort?: ProductSort): Record<string, 1 | -1> => {

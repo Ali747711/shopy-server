@@ -11,6 +11,7 @@ import healthRouter from "./routes/health.route";
 import userRouter from "./routes/user.route";
 import productRouter from "./routes/product.route";
 import eventRouter from "./routes/event.route";
+import aiRouter from "./routes/ai.route";
 import { errorHandler, notFound } from "./middlewares/error.middleware";
 
 const app = express();
@@ -33,6 +34,7 @@ app.use("/health", healthRouter);
 app.use("/api/auth", userRouter);
 app.use("/api/products", productRouter);
 app.use("/api/events", eventRouter);
+app.use("/api/ai", aiRouter);
 
 // Fallbacks
 app.use(notFound);
