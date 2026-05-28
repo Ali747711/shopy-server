@@ -138,6 +138,7 @@
                 { "key": "tags", "value": "lightweight,rain", "disabled": true },
                 { "key": "search", "value": "jacket", "disabled": true },
                 { "key": "sort", "value": "PRICE_ASC", "disabled": true },
+                { "key": "currency", "value": "EUR", "disabled": true, "description": "USD|EUR|GBP|KWD|UZS" },
                 { "key": "page", "value": "1" },
                 { "key": "limit", "value": "20" }
               ]
@@ -290,7 +291,7 @@
             "method": "POST",
             "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"qty\": 1 }\n  ]\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"qty\": 1 }\n  ],\n  \"currency\": \"USD\",\n  \"paymentMethod\": \"STRIPE\"\n}" },
             "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api", "orders"] }
           }
         },
@@ -327,6 +328,79 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"orderStatus\": \"PAID\"\n}" },
             "url": { "raw": "{{baseUrl}}/api/orders/{{orderId}}/status", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{orderId}}", "status"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reviews",
+      "item": [
+        {
+          "name": "List Reviews",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{productId}}/reviews?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "{{productId}}", "reviews"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add / Update My Review",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Excellent product!\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/products/{{productId}}/reviews", "host": ["{{baseUrl}}"], "path": ["api", "products", "{{productId}}", "reviews"] }
+          }
+        },
+        {
+          "name": "Delete My Review",
+          "request": {
+            "method": "DELETE",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "url": { "raw": "{{baseUrl}}/api/products/{{productId}}/reviews", "host": ["{{baseUrl}}"], "path": ["api", "products", "{{productId}}", "reviews"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Config (publishable key)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/payments/config", "host": ["{{baseUrl}}"], "path": ["api", "payments", "config"] }
+          }
+        },
+        {
+          "name": "Create Checkout Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && r.data.url) console.log('Open to pay:', r.data.url);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"{{orderId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/payments/checkout", "host": ["{{baseUrl}}"], "path": ["api", "payments", "checkout"] },
+            "description": "Create a STRIPE order first (Orders > Create Order with paymentMethod STRIPE), then run this. Returns a checkout.stripe.com URL to complete payment. The /api/payments/webhook endpoint marks the order PAID (needs `stripe listen` locally)."
           }
         }
       ]

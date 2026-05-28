@@ -9,6 +9,7 @@ export enum HttpCode {
   CONFLICT = 409,
   TOO_MANY_REQUESTS = 429,
   INTERNAL_SERVER_ERROR = 500,
+  SERVICE_UNAVAILABLE = 503,
 }
 
 export enum Message {
@@ -27,6 +28,10 @@ export enum Message {
   TOO_MANY_REQUESTS = "Too many requests, please slow down!",
   VALIDATION_FAILED = "Request validation failed!",
   INSUFFICIENT_STOCK = "Insufficient stock for one or more items!",
+  PAYMENTS_NOT_CONFIGURED = "Online payments are not configured!",
+  WEBHOOK_INVALID = "Invalid webhook signature!",
+  ORDER_ALREADY_PAID = "This order is already paid!",
+  NOT_STRIPE_ORDER = "This order is not set up for online payment!",
 }
 
 class Errors extends Error {

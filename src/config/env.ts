@@ -36,6 +36,13 @@ const envSchema = z.object({
   // AI guardrail
   AI_DAILY_BUDGET_USD: z.coerce.number().default(5),
 
+  // Stripe (optional — payment endpoints return 503 until set)
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_PUBLISHABLE_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  CHECKOUT_SUCCESS_URL: z.string().default("http://localhost:3000/checkout/success"),
+  CHECKOUT_CANCEL_URL: z.string().default("http://localhost:3000/checkout/cancel"),
+
   // Rate limiting
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),
   RATE_LIMIT_MAX: z.coerce.number().default(100),

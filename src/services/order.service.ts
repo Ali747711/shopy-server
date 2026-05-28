@@ -1,7 +1,9 @@
+import { convertFromUsd, normalizeCurrency } from "../config/currency";
 import { shapeIntoMongooseObjectId } from "../libs/configs";
 import Errors, { HttpCode, Message } from "../libs/Errors";
+import { Currency } from "../libs/enums/currency.enum";
 import { EventType } from "../libs/enums/event.enum";
-import { OrderStatus } from "../libs/enums/order.enum";
+import { OrderStatus, PaymentMethod } from "../libs/enums/order.enum";
 import { ProductStatus } from "../libs/enums/product.enum";
 import { UserType } from "../libs/enums/user.enum";
 import { Order, OrderInput, OrderInquiry } from "../libs/types/order";
@@ -26,6 +28,7 @@ class OrderService {
       .exec();
     const byId = new Map(products.map((p) => [String(p._id), p]));
 
+    const currency: Currency = normalizeCurrency(input.currency);
     const orderItems = input.items.map((item) => {
       const p = byId.get(item.productId);
       if (!p) throw new Errors(HttpCode.NOT_FOUND, Message.NO_DATA_FOUND);
@@ -35,7 +38,8 @@ class OrderService {
         productId: p._id,
         productName: p.productName,
         qty: item.qty,
-        priceAtPurchase: p.productPrice,
+        // lock the price in the order's currency at purchase time
+        priceAtPurchase: convertFromUsd(p.productPrice, currency),
       };
     });
 
@@ -43,13 +47,13 @@ class OrderService {
       (sum, i) => sum + i.priceAtPurchase * i.qty,
       0
     );
-    const orderCurrency = products[0]?.productCurrency ?? "USD";
 
     const created: any = await this.orderModel.create({
       userId: shapeIntoMongooseObjectId(userId),
       orderItems,
       orderTotal,
-      orderCurrency,
+      orderCurrency: currency,
+      paymentMethod: input.paymentMethod ?? PaymentMethod.COD,
     });
 
     // Decrement stock

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { OrderStatus } from "../libs/enums/order.enum";
+import { Currency } from "../libs/enums/currency.enum";
+import { OrderStatus, PaymentMethod } from "../libs/enums/order.enum";
 
 export const createOrderSchema = z.object({
   items: z
@@ -11,6 +12,8 @@ export const createOrderSchema = z.object({
     )
     .min(1)
     .max(50),
+  currency: z.nativeEnum(Currency).optional(),
+  paymentMethod: z.nativeEnum(PaymentMethod).optional(),
 });
 
 export const updateOrderStatusSchema = z.object({

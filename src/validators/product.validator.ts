@@ -34,4 +34,5 @@ export const productInquirySchema = z.object({
   maxPrice: z.coerce.number().nonnegative().optional(),
   search: z.string().optional(),
   sort: z.nativeEnum(ProductSort).optional(),
+  currency: z.string().optional(),
 });

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import productController from "../controllers/product.controller";
+import reviewController from "../controllers/review.controller";
 import userController from "../controllers/user.controller";
 import { validate } from "../middlewares/validate.middleware";
 import {
@@ -7,6 +8,10 @@ import {
   productInquirySchema,
   updateProductSchema,
 } from "../validators/product.validator";
+import {
+  reviewInquirySchema,
+  upsertReviewSchema,
+} from "../validators/review.validator";
 
 const productRouter = Router();
 
@@ -38,6 +43,24 @@ productRouter.delete(
   userController.verifyAuth,
   userController.verifyAdmin,
   productController.deleteProduct
+);
+
+// Reviews (nested under a product)
+productRouter.get(
+  "/:id/reviews",
+  validate(reviewInquirySchema, "query"),
+  reviewController.list
+);
+productRouter.post(
+  "/:id/reviews",
+  userController.verifyAuth,
+  validate(upsertReviewSchema),
+  reviewController.upsert
+);
+productRouter.delete(
+  "/:id/reviews",
+  userController.verifyAuth,
+  reviewController.remove
 );
 
 export default productRouter;

@@ -1,11 +1,12 @@
 import { ObjectId } from "mongoose";
-import { OrderStatus } from "../enums/order.enum";
+import { Currency } from "../enums/currency.enum";
+import { OrderStatus, PaymentMethod, PaymentStatus } from "../enums/order.enum";
 
 export interface OrderItem {
   productId: ObjectId;
   productName: string;
   qty: number;
-  priceAtPurchase: number;
+  priceAtPurchase: number; // in the order's currency, locked at purchase time
 }
 
 export interface Order {
@@ -13,8 +14,12 @@ export interface Order {
   userId: ObjectId;
   orderItems: OrderItem[];
   orderTotal: number;
-  orderCurrency: string;
+  orderCurrency: Currency;
   orderStatus: OrderStatus;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  stripeSessionId?: string;
+  stripePaymentIntentId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,6 +31,8 @@ export interface OrderItemInput {
 
 export interface OrderInput {
   items: OrderItemInput[];
+  currency?: Currency;
+  paymentMethod?: PaymentMethod;
 }
 
 export interface OrderInquiry {

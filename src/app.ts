@@ -14,6 +14,7 @@ import eventRouter from "./routes/event.route";
 import aiRouter from "./routes/ai.route";
 import recommendationRouter from "./routes/recommendation.route";
 import orderRouter from "./routes/order.route";
+import paymentRouter from "./routes/payment.route";
 import { errorHandler, notFound } from "./middlewares/error.middleware";
 import { requestId } from "./middlewares/requestId.middleware";
 import { aiRateLimiter, globalRateLimiter } from "./middlewares/rateLimit.middleware";
@@ -32,6 +33,9 @@ app.use(
     credentials: true,
   })
 );
+// Stripe webhook needs the raw body for signature verification — must run
+// before express.json so the body isn't consumed/parsed as JSON.
+app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -41,6 +45,9 @@ app.use(morgan(MORGAN_FORMAT));
 
 // Health is intentionally not rate-limited (monitoring/uptime probes).
 app.use("/health", healthRouter);
+
+// Payments mounted before the rate limiter so Stripe webhooks are never throttled.
+app.use("/api/payments", paymentRouter);
 
 // Per-IP guard across the API; AI endpoints get an extra tight limiter.
 app.use("/api", globalRateLimiter);

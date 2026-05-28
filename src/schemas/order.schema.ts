@@ -1,5 +1,6 @@
 import mongoose, { Schema } from "mongoose";
-import { OrderStatus } from "../libs/enums/order.enum";
+import { Currency } from "../libs/enums/currency.enum";
+import { OrderStatus, PaymentMethod, PaymentStatus } from "../libs/enums/order.enum";
 
 const orderItemSchema = new Schema(
   {
@@ -16,12 +17,24 @@ const orderSchema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     orderItems: { type: [orderItemSchema], required: true },
     orderTotal: { type: Number, required: true },
-    orderCurrency: { type: String, default: "USD" },
+    orderCurrency: { type: String, enum: Currency, default: Currency.USD },
     orderStatus: {
       type: String,
       enum: OrderStatus,
       default: OrderStatus.PENDING,
     },
+    paymentMethod: {
+      type: String,
+      enum: PaymentMethod,
+      default: PaymentMethod.COD,
+    },
+    paymentStatus: {
+      type: String,
+      enum: PaymentStatus,
+      default: PaymentStatus.UNPAID,
+    },
+    stripeSessionId: { type: String, index: true },
+    stripePaymentIntentId: { type: String },
   },
   { timestamps: true }
 );
