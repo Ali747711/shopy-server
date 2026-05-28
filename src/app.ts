@@ -8,6 +8,9 @@ import cookieParser from "cookie-parser";
 import { env } from "./config/env";
 import { MORGAN_FORMAT } from "./libs/configs";
 import healthRouter from "./routes/health.route";
+import userRouter from "./routes/user.route";
+import productRouter from "./routes/product.route";
+import eventRouter from "./routes/event.route";
 import { errorHandler, notFound } from "./middlewares/error.middleware";
 
 const app = express();
@@ -27,6 +30,9 @@ app.use(morgan(MORGAN_FORMAT));
 
 // Routes
 app.use("/health", healthRouter);
+app.use("/api/auth", userRouter);
+app.use("/api/products", productRouter);
+app.use("/api/events", eventRouter);
 
 // Fallbacks
 app.use(notFound);

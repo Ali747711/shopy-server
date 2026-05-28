@@ -3,7 +3,7 @@
 > **Purpose:** Single source of truth for *where we are*. Read this first at the start of every session, update it at the end. Pairs with [`system-design.md`](./system-design.md) (the *what/why*).
 
 **Last updated:** 2026-05-28
-**Current phase:** Phase 0 complete ✅ → Phase 1 next
+**Current phase:** Phase 1 complete ✅ → Phase 2 (AI search) next
 
 ---
 
@@ -28,11 +28,12 @@ AI-powered e-commerce **backend**. Express 5 + TypeScript (CommonJS) + Mongoose 
   - [x] `middlewares/error.middleware.ts` (notFound + errorHandler → envelope)
   - [x] `app.ts` (helmet, cors, json, cookieParser, compression, morgan) + `server.ts` bootstrap
   - [x] `/health` route (reports mongo + redis status) — **verified working**
-- [ ] **Phase 1 — Core domain**
-  - [ ] Auth: register / login / refresh / logout / me + `verifyAuth` + RBAC (`verifyAdmin`)
-  - [ ] Product CRUD (admin-gated writes) + listing with filters/pagination
-  - [ ] Events ingestion (`POST /api/events`)
-  - [ ] Zod `validate(schema)` middleware at request boundary
+- [x] **Phase 1 — Core domain** *(all 16 smoke-test flows passing)*
+  - [x] Auth: register / login / refresh / logout / me + `verifyAuth` + `verifyAdmin` + `optionalAuth`
+        — **access + refresh JWT** (refresh hashed SHA-256, stored server-side, rotated on use, revoked on logout)
+  - [x] Product CRUD (admin-gated writes) + public listing with filters + pagination (`$facet` aggregation)
+  - [x] Events ingestion (`POST /api/events`, optional auth — anonymous allowed)
+  - [x] Zod `validate(schema)` middleware (handles Express 5 getter-only `req.query`)
 - [ ] **Phase 2 — AI search (RAG)**
   - [ ] Embedding generation on product write
   - [ ] Vector index + hybrid search (vector + structured filters)
@@ -60,8 +61,8 @@ AI-powered e-commerce **backend**. Express 5 + TypeScript (CommonJS) + Mongoose 
 ## ⚠️ Open Decisions / Watch-outs (resolve before the relevant phase)
 
 1. **Vector search needs MongoDB Atlas.** `MONGODB_URI` currently points to **local Mongo** (`mongodb://localhost:27017/shopy`), which does **not** support Atlas Vector Search (needed in Phase 2). Before Phase 2: either switch to an Atlas cluster, or use an in-app cosine-similarity fallback. *(The `.env` has two `MONGODB_URI` lines — the local one wins; clean up before deploy.)*
-2. **Auth token model.** Design doc = access + refresh (rotation/revocation). House style = single JWT in httpOnly cookie. Pick one at start of Phase 1. (Leaning access+refresh per design doc; `.env` already has both secrets + TTLs.)
-3. **Response envelope vs raw house-style controllers.** We chose the envelope. House-style controllers normally return raw objects + the `Errors` object. Keep envelope consistent across all Phase 1 controllers.
+2. ~~**Auth token model.**~~ ✅ **Resolved (Phase 1):** access + refresh, refresh hashed/rotated/revocable. Tokens returned in body envelope AND set as httpOnly cookies (`refreshToken` scoped to `/api/auth`).
+3. **Response envelope vs raw house-style controllers.** We chose the envelope — applied consistently across all Phase 1 controllers via `ok()` / `fail()` + shared `catchHttp`.
 
 ---
 
@@ -76,21 +77,41 @@ AI-powered e-commerce **backend**. Express 5 + TypeScript (CommonJS) + Mongoose 
 
 ---
 
+## API Surface (live)
+
+- `GET  /health`
+- `POST /api/auth/register` · `POST /api/auth/login` · `POST /api/auth/refresh` · `POST /api/auth/logout` · `GET /api/auth/me`
+- `GET  /api/products` (filters: category, tags, minPrice, maxPrice, search, sort, page, limit) · `GET /api/products/:id`
+- `POST /api/products` · `PATCH /api/products/:id` · `DELETE /api/products/:id` *(admin only)*
+- `POST /api/events` *(optional auth)*
+
+**Verify locally:** `npx ts-node src/server.ts` in one shell, then `node scripts/smoke.mjs` → expect `16 passed, 0 failed`.
+*(Smoke test promotes a user to ADMIN directly in Mongo since registration always creates USER — there's no self-serve admin signup by design.)*
+
 ## File Map (current)
 
 ```
 src/
-  config/    env.ts · db.ts · redis.ts
-  libs/      Errors.ts · configs.ts
-             types/common.ts
-             utils/logger.ts · apiResponse.ts
-  middlewares/ error.middleware.ts
-  routes/    health.route.ts
+  config/      env.ts · db.ts · redis.ts
+  libs/
+    Errors.ts · configs.ts
+    enums/     user.enum.ts · product.enum.ts · event.enum.ts
+    types/     common.ts · user.ts · product.ts · event.ts
+    utils/     logger.ts · apiResponse.ts · httpCatch.ts
+  middlewares/ error.middleware.ts · validate.middleware.ts
+  schemas/     user.schema.ts · product.schema.ts · event.schema.ts
+  services/    auth.service.ts · user.service.ts · product.service.ts · event.service.ts
+  controllers/ user.controller.ts · product.controller.ts · event.controller.ts
+  validators/  user.validator.ts · product.validator.ts · event.validator.ts
+  routes/      health.route.ts · user.route.ts · product.route.ts · event.route.ts
   app.ts · server.ts
+scripts/       smoke.mjs
 ```
 
 ---
 
 ## Next Action
 
-Start **Phase 1**: decide auth token model (open decision #2), then build the `user` domain end-to-end (enum → types → schema → service → controller → route), wire `validate()` Zod middleware, and mount under `/api/auth`. Then `product`, then `events`.
+Start **Phase 2 — AI search (RAG)**. First resolve open decision #1 (vector store: switch `MONGODB_URI` to Atlas for Vector Search, or build an in-app cosine-similarity fallback over the existing `productEmbedding` field). Then: embed products on write (OpenAI `text-embedding-3-small`), intent extraction, hybrid search (vector + structured filters), streamed explanation, and Redis caching of embeddings/responses with the daily-budget guardrail.
+
+**No admin seed yet** — if Phase 2 needs catalog data, add a seed script (`scripts/seed.*`) or a one-off admin-promotion utility.
