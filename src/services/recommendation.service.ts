@@ -1,3 +1,5 @@
+import { openai } from "../config/openai";
+import { env } from "../config/env";
 import { redis } from "../config/redis";
 import { shapeIntoMongooseObjectId } from "../libs/configs";
 import Errors, { HttpCode, Message } from "../libs/Errors";
@@ -10,6 +12,7 @@ import {
 import { logger } from "../libs/utils/logger";
 import EventModel from "../schemas/event.schema";
 import ProductModel from "../schemas/product.schema";
+import CostService from "./ai/cost.service";
 import { vectorSearchProducts } from "./ai/vector";
 
 const DEFAULT_LIMIT = 10;
@@ -21,6 +24,7 @@ const PROJECTION =
 class RecommendationService {
   private readonly productModel = ProductModel;
   private readonly eventModel = EventModel;
+  private readonly costService = new CostService();
 
   /** "Because you viewed X" — products similar to one product's embedding. */
   public similar = async (
@@ -54,9 +58,10 @@ class RecommendationService {
   /** "Recommended for you" — personalized blend with cold-start fallback. */
   public forUser = async (
     userId: string,
-    limit = DEFAULT_LIMIT
+    limit = DEFAULT_LIMIT,
+    explain = false
   ): Promise<RecommendationResult> => {
-    const cacheKey = `rec:user:${userId}:${limit}`;
+    const cacheKey = `rec:user:${userId}:${limit}:${explain ? "x" : "b"}`;
     const cached = await redis.get<RecommendationResult>(cacheKey);
     if (cached) return { ...cached, cached: true };
 
@@ -107,7 +112,11 @@ class RecommendationService {
         items.push(...trend);
       }
 
-      result = { strategy: "personalized", items: items.slice(0, limit), cached: false };
+      let ranked = items.slice(0, limit);
+      // 4) optional LLM re-ranking + personalized reasons
+      if (explain && ranked.length) ranked = await this.llmRerank(profile.names, ranked);
+
+      result = { strategy: "personalized", items: ranked, cached: false };
     }
 
     await redis.set(cacheKey, result, { ex: PERSONAL_TTL });
@@ -146,7 +155,7 @@ class RecommendationService {
   /** Weighted average of engaged products' embeddings → a taste vector. */
   private profileVector = async (
     engaged: { _id: any; weight: number }[]
-  ): Promise<{ vector: number[] | null; topName: string }> => {
+  ): Promise<{ vector: number[] | null; topName: string; names: string[] }> => {
     const ids = engaged.map((e) => e._id);
     const products: any[] = await this.productModel
       .find({ _id: { $in: ids }, productStatus: ProductStatus.ACTIVE })
@@ -173,7 +182,70 @@ class RecommendationService {
     }
 
     if (acc && totalWeight > 0) for (let i = 0; i < acc.length; i++) acc[i] /= totalWeight;
-    return { vector: acc, topName };
+
+    const names = [...products]
+      .sort((a, b) => (weightOf.get(String(b._id)) ?? 0) - (weightOf.get(String(a._id)) ?? 0))
+      .map((p) => p.productName);
+
+    return { vector: acc, topName, names };
+  };
+
+  /**
+   * Opt-in: re-orders candidates and writes a short personalized reason per item
+   * using a cheap model. Falls back to the base order if budget is hit or it errors.
+   */
+  private llmRerank = async (
+    interests: string[],
+    items: RecommendedProduct[]
+  ): Promise<RecommendedProduct[]> => {
+    if (await this.costService.budgetExceeded()) return items;
+    try {
+      const list = items
+        .map(
+          (it, i) =>
+            `${i}. ${it.productName} (${it.productCategory}, $${it.productPrice}; tags: ${it.productTags.join(", ")})`
+        )
+        .join("\n");
+      const prompt = `The shopper has shown interest in: ${interests.slice(0, 6).join(", ") || "general browsing"}.
+Candidate products:
+${list}
+
+Re-order the candidates from most to least relevant for this shopper and give each a short reason (max ~12 words). Respond ONLY as JSON: {"ranked":[{"index":<candidate number>,"reason":"<reason>"}]} using only the indices above.`;
+
+      const res = await openai.chat.completions.create({
+        model: env.OPENAI_INTENT_MODEL,
+        temperature: 0.3,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: "You are a personalization re-ranking engine for e-commerce." },
+          { role: "user", content: prompt },
+        ],
+      });
+      await this.costService.record(
+        env.OPENAI_INTENT_MODEL,
+        res.usage?.prompt_tokens ?? 0,
+        res.usage?.completion_tokens ?? 0
+      );
+
+      const parsed = JSON.parse(res.choices[0]?.message?.content || "{}");
+      const ranked = Array.isArray(parsed.ranked) ? parsed.ranked : [];
+      const out: RecommendedProduct[] = [];
+      const used = new Set<number>();
+      for (const r of ranked) {
+        const idx = Number(r.index);
+        if (items[idx] && !used.has(idx)) {
+          used.add(idx);
+          out.push({ ...items[idx], reason: String(r.reason || items[idx].reason) });
+        }
+      }
+      items.forEach((it, i) => {
+        if (!used.has(i)) out.push(it);
+      });
+      return out.length ? out : items;
+    } catch (error) {
+      logger.warn("LLM re-rank failed; using base ordering", error);
+      return items;
+    }
   };
 
   /** "Users who engaged with what you did also engaged with…" */

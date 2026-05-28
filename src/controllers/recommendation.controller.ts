@@ -14,7 +14,8 @@ recommendationController.forUser = async (req: ExtendedRequest, res: Response) =
   try {
     logger.info("Recommendation controller [forUser]");
     const limit = Math.min(Number(req.query.limit) || 10, 50);
-    const result = await recommendationService.forUser(String(req.user!._id), limit);
+    const explain = req.query.explain === "true";
+    const result = await recommendationService.forUser(String(req.user!._id), limit, explain);
     res.status(HttpCode.OK).json(ok(result));
   } catch (error) {
     logger.error("Recommendation controller [forUser] failed", error);

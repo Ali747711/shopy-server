@@ -1,6 +1,10 @@
 import { MongoClient } from "mongodb";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const BASE = "http://localhost:4000";
+const MONGO_URI = process.env.MONGODB_URI || "mongodb://localhost:27017";
 let pass = 0;
 let fail = 0;
 
@@ -91,8 +95,8 @@ check("product create no-auth → 401", status === 401, status);
 ));
 check("product create as user → 403", status === 403, status);
 
-// promote to admin in DB
-const client = new MongoClient("mongodb://localhost:27017");
+// promote to admin in DB (same DB the app uses — Atlas or local)
+const client = new MongoClient(MONGO_URI);
 await client.connect();
 await client.db("shopy").collection("users").updateOne({ userEmail: email }, { $set: { userRole: "ADMIN" } });
 await client.close();

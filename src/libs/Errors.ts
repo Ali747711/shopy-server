@@ -26,6 +26,7 @@ export enum Message {
   NOT_AUTHORIZED = "You are not authorized to perform this action!",
   TOO_MANY_REQUESTS = "Too many requests, please slow down!",
   VALIDATION_FAILED = "Request validation failed!",
+  INSUFFICIENT_STOCK = "Insufficient stock for one or more items!",
 }
 
 class Errors extends Error {

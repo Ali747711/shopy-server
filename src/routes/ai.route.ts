@@ -13,4 +13,11 @@ aiRouter.post(
   aiController.search
 );
 
+aiRouter.post(
+  "/search/stream",
+  userController.optionalAuth,
+  validate(aiSearchSchema),
+  aiController.searchStream
+);
+
 export default aiRouter;

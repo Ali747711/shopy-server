@@ -34,25 +34,10 @@ export class AiSearchService {
   private readonly costService = new CostService();
 
   public search = async (query: string): Promise<AiSearchResult> => {
-    const normalized = query.toLowerCase().trim();
-    const cacheKey = `ai:search:${crypto
-      .createHash("sha256")
-      .update(normalized)
-      .digest("hex")}`;
-
-    const cached = await redis.get<AiSearchResult>(cacheKey);
+    const cached = await this.getCached(query);
     if (cached) return { ...cached, cached: true };
 
-    const degraded = await this.costService.budgetExceeded();
-    if (degraded) logger.warn("AI daily budget exceeded — degrading to non-LLM search");
-
-    const intent = degraded
-      ? this.fallbackIntent(query)
-      : await this.extractIntent(query);
-
-    const queryVector = await this.embeddingService.embed(query);
-    const products = await this.retrieve(queryVector, intent, query);
-
+    const { intent, products, degraded } = await this.resolve(query);
     const explanation =
       degraded || products.length === 0
         ? ""
@@ -66,8 +51,79 @@ export class AiSearchService {
       cached: false,
       degraded,
     };
-    await redis.set(cacheKey, result, { ex: RESULT_TTL_SECONDS });
+    await this.cacheResult(result);
     return result;
+  };
+
+  /** Intent + retrieval (everything except the explanation). Shared by search + stream. */
+  public resolve = async (
+    query: string
+  ): Promise<{ intent: SearchIntent; products: ScoredProduct[]; degraded: boolean }> => {
+    const degraded = await this.costService.budgetExceeded();
+    if (degraded) logger.warn("AI daily budget exceeded — degrading to non-LLM search");
+
+    const intent = degraded
+      ? this.fallbackIntent(query)
+      : await this.extractIntent(query);
+    const queryVector = await this.embeddingService.embed(query);
+    const products = await this.retrieve(queryVector, intent, query);
+    return { intent, products, degraded };
+  };
+
+  private cacheKeyFor = (query: string): string =>
+    `ai:search:${crypto
+      .createHash("sha256")
+      .update(query.toLowerCase().trim())
+      .digest("hex")}`;
+
+  public getCached = async (query: string): Promise<AiSearchResult | null> =>
+    (await redis.get<AiSearchResult>(this.cacheKeyFor(query))) ?? null;
+
+  public cacheResult = async (result: AiSearchResult): Promise<void> => {
+    await redis.set(this.cacheKeyFor(result.query), result, {
+      ex: RESULT_TTL_SECONDS,
+    });
+  };
+
+  /** Streams the explanation token-by-token; returns the assembled text. */
+  public streamExplanation = async (
+    query: string,
+    products: ScoredProduct[],
+    onToken: (token: string) => void
+  ): Promise<string> => {
+    try {
+      const stream = await openai.chat.completions.create({
+        model: env.OPENAI_CHAT_MODEL,
+        temperature: 0.4,
+        stream: true,
+        stream_options: { include_usage: true },
+        messages: [
+          { role: "system", content: EXPLAIN_SYSTEM_PROMPT },
+          { role: "user", content: this.buildContext(query, products) },
+        ],
+      });
+
+      let full = "";
+      let usage: any;
+      for await (const chunk of stream) {
+        const token = chunk.choices[0]?.delta?.content || "";
+        if (token) {
+          full += token;
+          onToken(token);
+        }
+        if (chunk.usage) usage = chunk.usage;
+      }
+      if (usage)
+        await this.costService.record(
+          env.OPENAI_CHAT_MODEL,
+          usage.prompt_tokens ?? 0,
+          usage.completion_tokens ?? 0
+        );
+      return full.trim();
+    } catch (error) {
+      logger.warn("Streaming explanation failed", error);
+      return "";
+    }
   };
 
   private extractIntent = async (query: string): Promise<SearchIntent> => {
@@ -142,23 +198,27 @@ export class AiSearchService {
     return docs.map((d) => this.toScored(d, 0));
   };
 
+  private buildContext = (query: string, products: ScoredProduct[]): string => {
+    const lines = products
+      .map(
+        (p) =>
+          `- ${p.productName} ($${p.productPrice} ${p.productCurrency}, ${p.productCategory}; tags: ${p.productTags.join(", ")})`
+      )
+      .join("\n");
+    return `Query: ${query}\n\nProducts:\n${lines}`;
+  };
+
   private explain = async (
     query: string,
     products: ScoredProduct[]
   ): Promise<string> => {
     try {
-      const context = products
-        .map(
-          (p) =>
-            `- ${p.productName} ($${p.productPrice} ${p.productCurrency}, ${p.productCategory}; tags: ${p.productTags.join(", ")})`
-        )
-        .join("\n");
       const res = await openai.chat.completions.create({
         model: env.OPENAI_CHAT_MODEL,
         temperature: 0.4,
         messages: [
           { role: "system", content: EXPLAIN_SYSTEM_PROMPT },
-          { role: "user", content: `Query: ${query}\n\nProducts:\n${context}` },
+          { role: "user", content: this.buildContext(query, products) },
         ],
       });
       await this.costService.record(

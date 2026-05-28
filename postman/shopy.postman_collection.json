@@ -8,7 +8,8 @@
     { "key": "baseUrl", "value": "http://localhost:4000" },
     { "key": "accessToken", "value": "" },
     { "key": "refreshToken", "value": "" },
-    { "key": "productId", "value": "" }
+    { "key": "productId", "value": "" },
+    { "key": "orderId", "value": "" }
   ],
   "item": [
     {
@@ -207,6 +208,16 @@
             "body": { "mode": "raw", "raw": "{\n  \"query\": \"lightweight jacket for rainy weather under $80\"\n}" },
             "url": { "raw": "{{baseUrl}}/api/ai/search", "host": ["{{baseUrl}}"], "path": ["api", "ai", "search"] }
           }
+        },
+        {
+          "name": "Search (SSE stream)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"comfortable running shoes for road jogging\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/ai/search/stream", "host": ["{{baseUrl}}"], "path": ["api", "ai", "search", "stream"] },
+            "description": "Server-Sent Events. Emits `meta` (intent + products), then `token` events streaming the explanation, then `done`."
+          }
         }
       ]
     },
@@ -237,7 +248,10 @@
               "raw": "{{baseUrl}}/api/recommendations?limit=10",
               "host": ["{{baseUrl}}"],
               "path": ["api", "recommendations"],
-              "query": [{ "key": "limit", "value": "10" }]
+              "query": [
+                { "key": "limit", "value": "10" },
+                { "key": "explain", "value": "true", "disabled": true, "description": "Opt-in LLM re-rank + personalized reasons" }
+              ]
             }
           }
         },
@@ -251,6 +265,68 @@
               "path": ["api", "recommendations", "similar", "{{productId}}"],
               "query": [{ "key": "limit", "value": "8" }]
             }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && r.data.order) pm.collectionVariables.set('orderId', r.data.order._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"qty\": 1 }\n  ]\n}" },
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api", "orders"] }
+          }
+        },
+        {
+          "name": "My Orders",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "status", "value": "PENDING", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Order",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{orderId}}"] }
+          }
+        },
+        {
+          "name": "Update Status (admin)",
+          "request": {
+            "method": "PATCH",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderStatus\": \"PAID\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/orders/{{orderId}}/status", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{orderId}}", "status"] }
           }
         }
       ]
