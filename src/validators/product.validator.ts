@@ -26,10 +26,14 @@ export const productInquirySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
   category: z.string().optional(),
+  // Accept either ?tags=a,b (CSV) or ?tags=a&tags=b (repeated → array).
   tags: z
-    .string()
-    .transform((s) => s.split(",").map((t) => t.trim()).filter(Boolean))
-    .optional(),
+    .preprocess((v) => {
+      if (Array.isArray(v)) return v.map(String);
+      if (typeof v === "string")
+        return v.split(",").map((t) => t.trim()).filter(Boolean);
+      return undefined;
+    }, z.array(z.string()).max(50).optional()),
   minPrice: z.coerce.number().nonnegative().optional(),
   maxPrice: z.coerce.number().nonnegative().optional(),
   search: z.string().optional(),

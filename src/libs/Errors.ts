@@ -27,6 +27,7 @@ export enum Message {
   NOT_AUTHORIZED = "You are not authorized to perform this action!",
   TOO_MANY_REQUESTS = "Too many requests, please slow down!",
   VALIDATION_FAILED = "Request validation failed!",
+  INVALID_ID = "Invalid id format!",
   INSUFFICIENT_STOCK = "Insufficient stock for one or more items!",
   PAYMENTS_NOT_CONFIGURED = "Online payments are not configured!",
   WEBHOOK_INVALID = "Invalid webhook signature!",

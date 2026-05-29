@@ -48,7 +48,10 @@ List endpoints put the array in `data` and pagination in `meta`.
 | PATCH | `/api/products/:id` | admin | partial update (re-embeds if name/desc/category/tags change) |
 | DELETE | `/api/products/:id` | admin | soft delete |
 
-**List query params:** `category`, `tags` (csv), `minPrice`, `maxPrice`, `search`, `sort` (`NEWEST|PRICE_ASC|PRICE_DESC|RATING`), `currency` (`USD|EUR|GBP|KWD|UZS`), `page` (default 1), `limit` (default 20, max 100).
+**List query params:** `category`, `tags`, `minPrice`, `maxPrice`, `search`, `sort` (`NEWEST|PRICE_ASC|PRICE_DESC|RATING`), `currency` (`USD|EUR|GBP|KWD|UZS`), `page` (default 1), `limit` (default 20, max 100).
+
+> **`tags`** accepts either form: CSV (`?tags=lightweight,rain`) **or** repeated keys (`?tags=lightweight&tags=rain`). Matches products having ANY of the tags.
+> **Invalid `:id`**: a malformed ObjectId (e.g. `/api/products/not-a-real-id`) returns **`400 { error: "Invalid id format!" }`**; a well-formed but non-existent id returns **`404`**. (Applies to all `:id` routes — products, orders, reviews, recommendations.)
 
 **Product shape (read):**
 ```jsonc
