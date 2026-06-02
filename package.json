@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "clean": "rm -rf dist",
     "type-check": "tsc --noEmit",
+    "postinstall": "npm run build",
     "seed": "ts-node scripts/seed.ts",
     "seed:temu": "ts-node scripts/seed-temu.ts",
     "create-index": "ts-node scripts/create-vector-index.ts",
