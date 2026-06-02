@@ -7,9 +7,12 @@ import { ok } from "../libs/utils/apiResponse";
 import { catchHttp } from "../libs/utils/httpCatch";
 import { logger } from "../libs/utils/logger";
 import AiSearchService from "../services/ai/search.service";
+import AiChatService from "../services/ai/chat.service";
 import EventService from "../services/event.service";
+import { ChatMessage } from "../libs/types/ai";
 
 const aiSearchService = new AiSearchService();
+const aiChatService = new AiChatService();
 const eventService = new EventService();
 const aiController: P = {};
 
@@ -66,6 +69,37 @@ aiController.searchStream = async (req: ExtendedRequest, res: Response) => {
   } catch (error) {
     logger.error("AI controller [searchStream] failed", error);
     send("error", { message: "Search failed" });
+    res.end();
+  }
+};
+
+aiController.chatStream = async (req: ExtendedRequest, res: Response) => {
+  logger.info("AI controller [chatStream]");
+  const messages = req.body.messages as ChatMessage[];
+  res.writeHead(HttpCode.OK, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  const send = (event: string, data: unknown) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    if (typeof (res as any).flush === "function") (res as any).flush();
+  };
+
+  try {
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    if (lastUser) logSearch(lastUser.content, req);
+
+    await aiChatService.streamChat(messages, {
+      onProducts: (products) => send("products", { products }),
+      onToken: (t) => send("token", { t }),
+    });
+    send("done", {});
+    res.end();
+  } catch (error) {
+    logger.error("AI controller [chatStream] failed", error);
+    send("error", { message: "Chat failed" });
     res.end();
   }
 };

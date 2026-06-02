@@ -12,6 +12,11 @@ export interface AiSearchInput {
   query: string;
 }
 
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface ScoredProduct {
   _id: string;
   productName: string;
