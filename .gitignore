@@ -19,3 +19,11 @@ npm-debug.log*
 
 STATUS.md
 .claude
+
+# Local-only — not pushed to GitHub
+data/
+docs/
+loadtest/
+postman/
+system-design.md
+.github/workflows/
