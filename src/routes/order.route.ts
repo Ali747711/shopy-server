@@ -22,6 +22,14 @@ orderRouter.get(
   validate(orderInquirySchema, "query"),
   orderController.getMyOrders
 );
+// Admin: list every order. Declared before "/:id" so it isn't treated as an id.
+orderRouter.get(
+  "/admin",
+  userController.verifyAuth,
+  userController.verifyAdmin,
+  validate(orderInquirySchema, "query"),
+  orderController.getAllOrders
+);
 orderRouter.get("/:id", userController.verifyAuth, orderController.getOrder);
 orderRouter.patch(
   "/:id/status",

@@ -53,4 +53,6 @@ export interface ProductInquiry {
   maxPrice?: number;
   search?: string;
   sort?: ProductSort;
+  /** Admin-only: narrow to a single product status. */
+  status?: ProductStatus;
 }

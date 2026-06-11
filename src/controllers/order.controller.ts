@@ -40,6 +40,20 @@ orderController.getMyOrders = async (req: ExtendedRequest, res: Response) => {
   }
 };
 
+orderController.getAllOrders = async (req: ExtendedRequest, res: Response) => {
+  try {
+    logger.info("Order controller [getAllOrders]");
+    const inquiry = req.query as any;
+    const { list, total } = await orderService.getAllOrders(inquiry);
+    res
+      .status(HttpCode.OK)
+      .json(ok(list, { total, page: inquiry.page, limit: inquiry.limit }));
+  } catch (error) {
+    logger.error("Order controller [getAllOrders] failed", error);
+    catchHttp(res, error);
+  }
+};
+
 orderController.getOrder = async (req: ExtendedRequest, res: Response) => {
   try {
     logger.info("Order controller [getOrder]");

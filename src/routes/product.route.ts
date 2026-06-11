@@ -4,6 +4,7 @@ import reviewController from "../controllers/review.controller";
 import userController from "../controllers/user.controller";
 import { validate } from "../middlewares/validate.middleware";
 import {
+  adminProductInquirySchema,
   createProductSchema,
   productInquirySchema,
   updateProductSchema,
@@ -20,6 +21,14 @@ productRouter.get(
   "/",
   validate(productInquirySchema, "query"),
   productController.getProducts
+);
+// Admin: list every product (any status). Before "/:id" so it isn't an id.
+productRouter.get(
+  "/admin",
+  userController.verifyAuth,
+  userController.verifyAdmin,
+  validate(adminProductInquirySchema, "query"),
+  productController.getAllProducts
 );
 productRouter.get("/:id", productController.getProduct);
 

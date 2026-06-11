@@ -16,6 +16,7 @@ import aiRouter from "./routes/ai.route";
 import recommendationRouter from "./routes/recommendation.route";
 import orderRouter from "./routes/order.route";
 import paymentRouter from "./routes/payment.route";
+import adminRouter from "./routes/admin.route";
 import { errorHandler, notFound } from "./middlewares/error.middleware";
 import { requestId } from "./middlewares/requestId.middleware";
 import { aiRateLimiter, globalRateLimiter } from "./middlewares/rateLimit.middleware";
@@ -61,6 +62,7 @@ app.use("/api/events", eventRouter);
 app.use("/api/ai", aiRouter);
 app.use("/api/recommendations", recommendationRouter);
 app.use("/api/orders", orderRouter);
+app.use("/api/admin", adminRouter);
 
 // Fallbacks
 app.use(notFound);

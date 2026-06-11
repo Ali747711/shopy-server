@@ -34,6 +34,21 @@ productController.getProducts = async (req: Request, res: Response) => {
   }
 };
 
+productController.getAllProducts = async (req: Request, res: Response) => {
+  try {
+    logger.info("Product controller [getAllProducts]");
+    const inquiry = req.query as any;
+    const { list, total } = await productService.getAllProducts(inquiry);
+    // Admins edit the stored USD base price, so return products unconverted.
+    res
+      .status(HttpCode.OK)
+      .json(ok(list, { total, page: inquiry.page, limit: inquiry.limit }));
+  } catch (error) {
+    logger.error("Product controller [getAllProducts] failed", error);
+    catchHttp(res, error);
+  }
+};
+
 productController.getProduct = async (req: Request, res: Response) => {
   try {
     logger.info("Product controller [getProduct]");

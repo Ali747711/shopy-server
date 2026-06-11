@@ -100,6 +100,26 @@ class OrderService {
     return { list: list as any, total };
   };
 
+  /** Admin: list every order, optionally filtered by status. Not user-scoped. */
+  public getAllOrders = async (
+    inquiry: OrderInquiry
+  ): Promise<{ list: Order[]; total: number }> => {
+    const match: any = {};
+    if (inquiry.status) match.orderStatus = inquiry.status;
+
+    const [list, total] = await Promise.all([
+      this.orderModel
+        .find(match)
+        .sort({ createdAt: -1 })
+        .skip((inquiry.page - 1) * inquiry.limit)
+        .limit(inquiry.limit)
+        .lean()
+        .exec(),
+      this.orderModel.countDocuments(match),
+    ]);
+    return { list: list as any, total };
+  };
+
   public getOrder = async (
     orderId: string,
     userId: string,

@@ -52,7 +52,29 @@ class ProductService {
   public getProducts = async (
     inquiry: ProductInquiry
   ): Promise<{ list: Product[]; total: number }> => {
-    const match: any = { productStatus: ProductStatus.ACTIVE };
+    // Storefront: only live products.
+    const match = this.buildMatch(inquiry, {
+      productStatus: ProductStatus.ACTIVE,
+    });
+    return this.paginate(match, inquiry);
+  };
+
+  /**
+   * Admin: list products regardless of ACTIVE state. Defaults to everything
+   * except soft-deleted; an explicit `status` narrows to one state.
+   */
+  public getAllProducts = async (
+    inquiry: ProductInquiry & { status?: ProductStatus }
+  ): Promise<{ list: Product[]; total: number }> => {
+    const base = inquiry.status
+      ? { productStatus: inquiry.status }
+      : { productStatus: { $ne: ProductStatus.DELETE } };
+    return this.paginate(this.buildMatch(inquiry, base), inquiry);
+  };
+
+  /** Build the shared filter (category/tags/price/search) on top of a base. */
+  private buildMatch = (inquiry: ProductInquiry, base: Record<string, any>) => {
+    const match: any = { ...base };
     if (inquiry.category) match.productCategory = inquiry.category;
     if (inquiry.tags?.length) match.productTags = { $in: inquiry.tags };
     if (inquiry.minPrice != null || inquiry.maxPrice != null) {
@@ -64,7 +86,14 @@ class ProductService {
       const regex = new RegExp(inquiry.search, "i");
       match.$or = [{ productName: regex }, { productDescription: regex }];
     }
+    return match;
+  };
 
+  /** Run the faceted list+count aggregation for a given match. */
+  private paginate = async (
+    match: Record<string, any>,
+    inquiry: ProductInquiry
+  ): Promise<{ list: Product[]; total: number }> => {
     const result: any = await this.productModel
       .aggregate([
         { $match: match },

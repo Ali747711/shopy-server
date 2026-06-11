@@ -40,3 +40,8 @@ export const productInquirySchema = z.object({
   sort: z.nativeEnum(ProductSort).optional(),
   currency: z.string().optional(),
 });
+
+/** Admin product listing: same filters plus an optional status narrow. */
+export const adminProductInquirySchema = productInquirySchema.extend({
+  status: z.nativeEnum(ProductStatus).optional(),
+});
