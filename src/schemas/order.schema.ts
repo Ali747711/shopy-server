@@ -1,6 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 import { Currency } from "../libs/enums/currency.enum";
 import { OrderStatus, PaymentMethod, PaymentStatus } from "../libs/enums/order.enum";
+import { addressFieldsSchema } from "./address.schema";
 
 const orderItemSchema = new Schema(
   {
@@ -16,6 +17,7 @@ const orderSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     orderItems: { type: [orderItemSchema], required: true },
+    shippingAddress: { type: addressFieldsSchema },
     orderTotal: { type: Number, required: true },
     orderCurrency: { type: String, enum: Currency, default: Currency.USD },
     orderStatus: {

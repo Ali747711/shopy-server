@@ -11,6 +11,12 @@ export const loginSchema = z.object({
   userPassword: z.string().min(1),
 });
 
-export const refreshSchema = z.object({
-  refreshToken: z.string().min(1).optional(),
-});
+// The refresh token normally arrives via the httpOnly cookie, so the request
+// body is often empty. Express 5 leaves `req.body` as `undefined` for bodyless
+// POSTs, and `z.object(...)` rejects `undefined`. Defaulting to `{}` lets these
+// cookie-only requests through to the controller (which then reads the cookie).
+export const refreshSchema = z
+  .object({
+    refreshToken: z.string().min(1).optional(),
+  })
+  .default({});

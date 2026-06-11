@@ -1,6 +1,7 @@
 import { ObjectId } from "mongoose";
 import { Currency } from "../enums/currency.enum";
 import { OrderStatus, PaymentMethod, PaymentStatus } from "../enums/order.enum";
+import { AddressFields } from "./address";
 
 export interface OrderItem {
   productId: ObjectId;
@@ -13,6 +14,7 @@ export interface Order {
   _id: ObjectId;
   userId: ObjectId;
   orderItems: OrderItem[];
+  shippingAddress?: AddressFields;
   orderTotal: number;
   orderCurrency: Currency;
   orderStatus: OrderStatus;
@@ -33,6 +35,7 @@ export interface OrderInput {
   items: OrderItemInput[];
   currency?: Currency;
   paymentMethod?: PaymentMethod;
+  shippingAddress?: AddressFields;
 }
 
 export interface OrderInquiry {

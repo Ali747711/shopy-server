@@ -1,6 +1,19 @@
 import { z } from "zod";
 import { Currency } from "../libs/enums/currency.enum";
 import { OrderStatus, PaymentMethod } from "../libs/enums/order.enum";
+import { addressInputSchema } from "./address.validator";
+
+/** Just the shipping fields — label/isDefault don't belong on an order snapshot. */
+export const shippingAddressSchema = addressInputSchema.pick({
+  fullName: true,
+  phone: true,
+  address1: true,
+  address2: true,
+  city: true,
+  state: true,
+  postalCode: true,
+  country: true,
+});
 
 export const createOrderSchema = z.object({
   items: z
@@ -14,6 +27,7 @@ export const createOrderSchema = z.object({
     .max(50),
   currency: z.nativeEnum(Currency).optional(),
   paymentMethod: z.nativeEnum(PaymentMethod).optional(),
+  shippingAddress: shippingAddressSchema,
 });
 
 export const updateOrderStatusSchema = z.object({

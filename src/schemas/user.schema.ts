@@ -1,5 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 import { PriceSensitivity, UserStatus, UserType } from "../libs/enums/user.enum";
+import { savedAddressSchema } from "./address.schema";
 
 const refreshTokenSchema = new Schema(
   {
@@ -31,6 +32,7 @@ const userSchema = new Schema(
         default: PriceSensitivity.MEDIUM,
       },
     },
+    addresses: { type: [savedAddressSchema], default: [] },
     refreshTokens: { type: [refreshTokenSchema], default: [], select: false },
   },
   { timestamps: true }

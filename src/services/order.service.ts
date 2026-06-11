@@ -51,6 +51,7 @@ class OrderService {
     const created: any = await this.orderModel.create({
       userId: shapeIntoMongooseObjectId(userId),
       orderItems,
+      shippingAddress: input.shippingAddress,
       orderTotal,
       orderCurrency: currency,
       paymentMethod: input.paymentMethod ?? PaymentMethod.COD,

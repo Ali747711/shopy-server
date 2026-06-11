@@ -1,6 +1,7 @@
 import { ObjectId, Types } from "mongoose";
 import { Request } from "express";
 import { PriceSensitivity, UserStatus, UserType } from "../enums/user.enum";
+import { Address } from "./address";
 
 export interface UserPreferences {
   categories: string[];
@@ -21,6 +22,7 @@ export interface User {
   userRole: UserType;
   userStatus: UserStatus;
   userPreferences: UserPreferences;
+  addresses?: Address[];
   refreshTokens?: RefreshTokenRecord[];
   createdAt: Date;
   updatedAt: Date;
